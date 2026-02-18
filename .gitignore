@@ -3,6 +3,9 @@ dist/
 build/
 .env
 *.db
+*.db-shm
+*.db-wal
 uploads/
 *.log
 .DS_Store
+tsconfig.tsbuildinfo
