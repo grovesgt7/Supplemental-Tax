@@ -1,15 +1,109 @@
-import Database, { Database as DatabaseType } from 'better-sqlite3';
+import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import path from 'path';
+import fs from 'fs';
 
 const DB_PATH = path.join(__dirname, '..', 'supplemental_tax.db');
 
-const db: DatabaseType = new Database(DB_PATH);
+let sqlDb: SqlJsDatabase;
+let inTransaction = false;
 
-// Enable WAL mode for better concurrent read performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+function saveToFile(): void {
+  if (inTransaction || !sqlDb) return;
+  const data = sqlDb.export();
+  fs.writeFileSync(DB_PATH, Buffer.from(data));
+}
 
-function initDatabase(): void {
+/**
+ * Wrapper around sql.js that provides a better-sqlite3-compatible API.
+ * This allows all existing route files to work without changes.
+ */
+const db = {
+  prepare(sql: string) {
+    return {
+      get(...params: unknown[]): Record<string, unknown> | undefined {
+        const stmt = sqlDb.prepare(sql);
+        try {
+          if (params.length > 0) {
+            stmt.bind(params.map(p => p === undefined ? null : p) as (number | string | Uint8Array | null)[]);
+          }
+          if (stmt.step()) {
+            return stmt.getAsObject() as Record<string, unknown>;
+          }
+          return undefined;
+        } finally {
+          stmt.free();
+        }
+      },
+
+      all(...params: unknown[]): Record<string, unknown>[] {
+        const stmt = sqlDb.prepare(sql);
+        try {
+          if (params.length > 0) {
+            stmt.bind(params.map(p => p === undefined ? null : p) as (number | string | Uint8Array | null)[]);
+          }
+          const rows: Record<string, unknown>[] = [];
+          while (stmt.step()) {
+            rows.push(stmt.getAsObject() as Record<string, unknown>);
+          }
+          return rows;
+        } finally {
+          stmt.free();
+        }
+      },
+
+      run(...params: unknown[]): { changes: number } {
+        if (params.length > 0) {
+          sqlDb.run(sql, params.map(p => p === undefined ? null : p) as (number | string | Uint8Array | null)[]);
+        } else {
+          sqlDb.run(sql);
+        }
+        saveToFile();
+        return { changes: sqlDb.getRowsModified() };
+      },
+    };
+  },
+
+  exec(sql: string): void {
+    sqlDb.exec(sql);
+    saveToFile();
+  },
+
+  pragma(pragma: string): void {
+    sqlDb.run(`PRAGMA ${pragma}`);
+  },
+
+  transaction<T>(fn: () => T): () => T {
+    return () => {
+      sqlDb.run('BEGIN TRANSACTION');
+      inTransaction = true;
+      try {
+        const result = fn();
+        sqlDb.run('COMMIT');
+        inTransaction = false;
+        saveToFile();
+        return result;
+      } catch (err) {
+        sqlDb.run('ROLLBACK');
+        inTransaction = false;
+        throw err;
+      }
+    };
+  },
+};
+
+async function initDatabase(): Promise<void> {
+  const SQL = await initSqlJs();
+
+  if (fs.existsSync(DB_PATH)) {
+    const buffer = fs.readFileSync(DB_PATH);
+    sqlDb = new SQL.Database(buffer);
+  } else {
+    sqlDb = new SQL.Database();
+  }
+
+  // Enable foreign keys
+  sqlDb.run('PRAGMA foreign_keys = ON');
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,
@@ -94,8 +188,5 @@ function initDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_uploaded_documents_bill_id ON uploaded_documents(bill_id);
   `);
 }
-
-// Initialize the database on module import
-initDatabase();
 
 export { db, initDatabase };

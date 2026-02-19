@@ -53,19 +53,21 @@ if (fs.existsSync(frontendDist)) {
   });
 }
 
-// Initialize database and start server
-try {
-  initDatabase();
-  console.log('Database initialized successfully.');
-} catch (err) {
-  console.error('Failed to initialize database:', err);
-  process.exit(1);
-}
+// Initialize database (async for sql.js) and start server
+(async () => {
+  try {
+    await initDatabase();
+    console.log('Database initialized successfully.');
+  } catch (err) {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+  }
 
-app.listen(PORT, () => {
-  console.log(`CA Supplemental Tax Analyzer backend running on http://localhost:${PORT}`);
-  console.log(`API endpoints available at http://localhost:${PORT}/api/`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-});
+  app.listen(PORT, () => {
+    console.log(`CA Supplemental Tax Analyzer backend running on http://localhost:${PORT}`);
+    console.log(`API endpoints available at http://localhost:${PORT}/api/`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+  });
+})();
 
 export default app;
