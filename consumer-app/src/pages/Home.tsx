@@ -1,4 +1,7 @@
 import { Link } from 'react-router-dom';
+import AddressAutocomplete from '../components/AddressAutocomplete';
+import { useProperty } from '../context/PropertyContext';
+import { COUNTY_RATES } from '../lib/tax';
 
 const tools = [
   {
@@ -49,6 +52,8 @@ const tools = [
 ];
 
 export default function Home() {
+  const { property, setProperty } = useProperty();
+
   return (
     <div className="space-y-12">
       {/* Hero */}
@@ -64,6 +69,47 @@ export default function Home() {
           your bills' math, and help you avoid penalties — free, no sign-up, and nothing you enter leaves your
           browser.
         </p>
+
+        <div className="pt-2 space-y-3">
+          <AddressAutocomplete
+            size="lg"
+            showConfirmation={false}
+            placeholder="Start typing your home address…"
+            onSelect={(address, county) => setProperty({ address, county })}
+          />
+          {property.address ? (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-left">
+              <p className="text-sm text-emerald-900">
+                <span className="font-semibold">✓ {property.address}</span>
+                {property.county && (
+                  <>
+                    {' '}
+                    — {property.county} County
+                    {property.county in COUNTY_RATES && (
+                      <> (typical tax rate {COUNTY_RATES[property.county].toFixed(2)}%)</>
+                    )}
+                  </>
+                )}
+              </p>
+              <p className="text-sm text-emerald-800 mt-1.5">
+                Every tool below is now pre-filled for your property. Where would you like to start?
+              </p>
+              <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                <Link to="/estimate" className="btn-primary text-sm py-2.5">
+                  I just bought — estimate my taxes
+                </Link>
+                <Link to="/annual" className="btn-secondary text-sm py-2.5">
+                  Analyze my annual bill
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">
+              Your county and tax rate fill in automatically. The address is processed in your browser and never
+              stored. Or skip this and pick a tool below.
+            </p>
+          )}
+        </div>
       </section>
 
       {/* Tool cards */}

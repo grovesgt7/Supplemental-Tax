@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import MoneyInput from '../components/MoneyInput';
 import CountyRatePicker from '../components/CountyRatePicker';
-import AddressLookup from '../components/AddressLookup';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 import ReportButton from '../components/ReportButton';
 import Callout from '../components/Callout';
+import { useProperty } from '../context/PropertyContext';
 import {
   analyzeAnnualBill,
   formatCurrency,
@@ -11,19 +12,25 @@ import {
   formatPercent,
   parseDollars,
   HOMEOWNERS_EXEMPTION,
+  COUNTY_RATES,
   type AnnualBillAnalysis,
 } from '../lib/tax';
 import type { ReportData } from '../lib/report';
 
 export default function AnnualAnalyzer() {
+  const { property, setProperty } = useProperty();
+  const initialCounty = property.county in COUNTY_RATES ? property.county : '';
+
   const [assessedValue, setAssessedValue] = useState('');
   const [priorValue, setPriorValue] = useState('');
-  const [county, setCounty] = useState('');
-  const [rate, setRate] = useState('1.10');
+  const [county, setCounty] = useState(initialCounty);
+  const [rate, setRate] = useState(
+    initialCounty ? COUNTY_RATES[initialCounty].toFixed(2) : '1.10'
+  );
   const [directCharges, setDirectCharges] = useState('');
   const [hasExemption, setHasExemption] = useState<'yes' | 'no' | 'unsure'>('unsure');
   const [changedHands, setChangedHands] = useState(false);
-  const [address, setAddress] = useState('');
+  const [address, setAddress] = useState(property.address);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnnualBillAnalysis | null>(null);
 
@@ -67,12 +74,23 @@ export default function AnnualAnalyzer() {
       </header>
 
       <form onSubmit={handleSubmit} className="card sm:p-8 space-y-6">
-        <AddressLookup
-          onResolved={(foundCounty, matchedAddress) => {
-            setCounty(foundCounty);
-            setAddress(matchedAddress);
-          }}
-        />
+        <div>
+          <label className="input-label">
+            Your address <span className="font-normal text-gray-500">(optional)</span>
+          </label>
+          <AddressAutocomplete
+            initialValue={property.address}
+            initialCounty={property.county}
+            onSelect={(matchedAddress, foundCounty) => {
+              setAddress(matchedAddress);
+              setProperty({ address: matchedAddress, county: foundCounty });
+              if (foundCounty in COUNTY_RATES) {
+                setCounty(foundCounty);
+                setRate(COUNTY_RATES[foundCounty].toFixed(2));
+              }
+            }}
+          />
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <MoneyInput
