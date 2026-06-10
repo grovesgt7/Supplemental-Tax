@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildReportHTML, escapeHtml } from './report';
-import { countyPortal, BOE_ASSESSOR_DIRECTORY } from './countyLinks';
+import { countyPortal, NETR_CA_DIRECTORY, CA_COUNTIES } from './countyLinks';
+import { COUNTY_RATES } from './tax';
 import { lookupAddress } from './geocode';
 
 describe('escapeHtml', () => {
@@ -47,16 +48,30 @@ describe('buildReportHTML', () => {
 });
 
 describe('countyPortal', () => {
-  it('returns a curated link for known counties', () => {
-    const p = countyPortal('Los Angeles');
-    expect(p.isDirectory).toBe(false);
-    expect(p.url).toContain('lacounty.gov');
+  it('builds the NETR county URL with a snake_case slug', () => {
+    expect(countyPortal('Los Angeles').url).toBe(
+      'https://publicrecords.netronline.com/state/CA/county/los_angeles'
+    );
+    expect(countyPortal('San Luis Obispo').url).toBe(
+      'https://publicrecords.netronline.com/state/CA/county/san_luis_obispo'
+    );
+    expect(countyPortal('Alpine').isDirectory).toBe(false);
   });
 
-  it('falls back to the BOE directory for other counties', () => {
-    const p = countyPortal('Alpine');
+  it('covers every CA county, and falls back to the state directory otherwise', () => {
+    for (const county of CA_COUNTIES) {
+      expect(countyPortal(county).isDirectory).toBe(false);
+    }
+    const p = countyPortal('Not A County');
     expect(p.isDirectory).toBe(true);
-    expect(p.url).toBe(BOE_ASSESSOR_DIRECTORY);
+    expect(p.url).toBe(NETR_CA_DIRECTORY);
+  });
+
+  it('has a tax rate for all 58 counties', () => {
+    expect(CA_COUNTIES).toHaveLength(58);
+    for (const county of CA_COUNTIES) {
+      expect(COUNTY_RATES[county], county).toBeGreaterThan(0);
+    }
   });
 });
 

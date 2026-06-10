@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import { useProperty } from '../context/PropertyContext';
+import { countyPortal } from '../lib/countyLinks';
 import { COUNTY_RATES } from '../lib/tax';
 
 const tools = [
@@ -91,6 +92,21 @@ export default function Home() {
                   </>
                 )}
               </p>
+              {property.county && (
+                <p className="text-sm text-emerald-800 mt-1.5">
+                  Need your assessed value or a copy of a bill? Find your county's official assessor and tax
+                  collector sites in the{' '}
+                  <a
+                    href={countyPortal(property.county).url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold underline"
+                  >
+                    {countyPortal(property.county).label}
+                  </a>
+                  .
+                </p>
+              )}
               <p className="text-sm text-emerald-800 mt-1.5">
                 Every tool below is now pre-filled for your property. Where would you like to start?
               </p>

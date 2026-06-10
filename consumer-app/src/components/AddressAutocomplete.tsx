@@ -217,7 +217,7 @@ export default function AddressAutocomplete({
               <p className="font-semibold">✓ {confirmed.county} County</p>
               {portal && (
                 <p className="mt-0.5">
-                  Need your assessed value? Look it up free at the{' '}
+                  Need your assessed value? Find your county's official assessor and tax collector sites in the{' '}
                   <a
                     href={portal.url}
                     target="_blank"
@@ -226,7 +226,7 @@ export default function AddressAutocomplete({
                   >
                     {portal.label}
                   </a>
-                  {portal.isDirectory ? ' — find your county in the list.' : '.'}
+                  {portal.isDirectory ? ' — pick your county from the list.' : '.'}
                 </p>
               )}
             </div>

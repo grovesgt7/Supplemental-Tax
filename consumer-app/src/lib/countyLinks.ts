@@ -1,68 +1,47 @@
 /**
- * Official county property-tax lookup portals.
- *
- * Curated links for the counties where we're confident in a stable URL;
- * everything else falls back to the State Board of Equalization's directory
- * of all 58 county assessors.
+ * County office links via NETR Online's Public Records Directory
+ * (publicrecords.netronline.com) — a stable, uniform directory with one
+ * page per county linking to the official Assessor, Treasurer-Tax
+ * Collector, and Recorder sites. One URL pattern covers all 58 CA
+ * counties, e.g. /state/CA/county/santa_clara.
  */
 
-export const BOE_ASSESSOR_DIRECTORY = 'https://www.boe.ca.gov/proptaxes/assessors.htm';
+export const NETR_CA_DIRECTORY = 'https://publicrecords.netronline.com/state/CA';
 
-const PORTALS: Record<string, { url: string; label: string }> = {
-  'Los Angeles': {
-    url: 'https://portal.assessor.lacounty.gov/',
-    label: 'LA County Assessor Portal',
-  },
-  'San Diego': {
-    url: 'https://www.sdttc.com/',
-    label: 'San Diego County Treasurer-Tax Collector',
-  },
-  Orange: {
-    url: 'https://tax.ocgov.com/',
-    label: 'Orange County Tax Collector',
-  },
-  Riverside: {
-    url: 'https://www.countytreasurer.org/',
-    label: 'Riverside County Treasurer-Tax Collector',
-  },
-  'San Bernardino': {
-    url: 'https://www.mytaxcollector.com/',
-    label: 'San Bernardino County Tax Collector',
-  },
-  'Santa Clara': {
-    url: 'https://www.sccassessor.org/',
-    label: 'Santa Clara County Assessor',
-  },
-  Alameda: {
-    url: 'https://www.acgov.org/propertytax/',
-    label: 'Alameda County Property Tax',
-  },
-  Sacramento: {
-    url: 'https://eproptax.saccounty.gov/',
-    label: 'Sacramento County e-PropTax',
-  },
-  'San Francisco': {
-    url: 'https://www.sfassessor.org/',
-    label: 'SF Assessor-Recorder',
-  },
-  Kern: {
-    url: 'https://www.kcttc.co.kern.ca.us/',
-    label: 'Kern County Treasurer-Tax Collector',
-  },
-};
+/** All 58 California counties. */
+export const CA_COUNTIES = [
+  'Alameda', 'Alpine', 'Amador', 'Butte', 'Calaveras', 'Colusa', 'Contra Costa',
+  'Del Norte', 'El Dorado', 'Fresno', 'Glenn', 'Humboldt', 'Imperial', 'Inyo',
+  'Kern', 'Kings', 'Lake', 'Lassen', 'Los Angeles', 'Madera', 'Marin',
+  'Mariposa', 'Mendocino', 'Merced', 'Modoc', 'Mono', 'Monterey', 'Napa',
+  'Nevada', 'Orange', 'Placer', 'Plumas', 'Riverside', 'Sacramento',
+  'San Benito', 'San Bernardino', 'San Diego', 'San Francisco', 'San Joaquin',
+  'San Luis Obispo', 'San Mateo', 'Santa Barbara', 'Santa Clara', 'Santa Cruz',
+  'Shasta', 'Sierra', 'Siskiyou', 'Solano', 'Sonoma', 'Stanislaus', 'Sutter',
+  'Tehama', 'Trinity', 'Tulare', 'Tuolumne', 'Ventura', 'Yolo', 'Yuba',
+] as const;
+
+const COUNTY_SET = new Set<string>(CA_COUNTIES);
 
 export interface CountyPortal {
   url: string;
   label: string;
-  isDirectory: boolean; // true when falling back to the statewide directory
+  /** true when falling back to the statewide directory page */
+  isDirectory: boolean;
 }
 
 export function countyPortal(county: string): CountyPortal {
-  const portal = PORTALS[county];
-  if (portal) return { ...portal, isDirectory: false };
+  if (COUNTY_SET.has(county)) {
+    const slug = county.toLowerCase().replace(/ /g, '_');
+    return {
+      url: `https://publicrecords.netronline.com/state/CA/county/${slug}`,
+      label: `${county} County offices directory`,
+      isDirectory: false,
+    };
+  }
   return {
-    url: BOE_ASSESSOR_DIRECTORY,
-    label: 'CA directory of county assessors',
+    url: NETR_CA_DIRECTORY,
+    label: 'California county offices directory',
     isDirectory: true,
   };
 }
