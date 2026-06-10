@@ -1,6 +1,6 @@
 {
   "name": "mytaxbill-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Consumer-facing California property tax & supplemental tax bill analyzer",
