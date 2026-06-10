@@ -11,6 +11,13 @@ deployable to any static host (Netlify, Vercel, GitHub Pages, S3).
 
 ## Features
 
+- **Address lookup** — Enter a street address and the app finds the county
+  (free U.S. Census geocoder, no key, nothing stored), fills in the typical
+  tax rate, and links to that county's official portal to find the assessed
+  value. Falls back gracefully to manual county selection.
+- **Printable PDF reports** — Every tool can generate a clean, self-contained
+  report (inputs, results, deadlines, action checklist) that opens in a new
+  tab for printing or saving as a PDF via the browser's print dialog.
 - **Supplemental tax estimator** — Just bought (or buying) a home? Enter the
   closing date, purchase price, the seller's old assessed value, and county.
   Get the expected number of supplemental bills (one vs. two), the amount of

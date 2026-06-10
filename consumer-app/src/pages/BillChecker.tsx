@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import MoneyInput from '../components/MoneyInput';
+import ReportButton from '../components/ReportButton';
 import Callout from '../components/Callout';
 import {
   estimateSupplementalTax,
@@ -11,6 +12,7 @@ import {
   type Installment,
   type BillCheckResult,
 } from '../lib/tax';
+import type { ReportData } from '../lib/report';
 
 interface CheckOutcome {
   check: BillCheckResult;
@@ -209,6 +211,42 @@ function RadioCard({
   );
 }
 
+function buildReport(outcome: CheckOutcome): ReportData {
+  const { check, installments } = outcome;
+  const verdictText =
+    check.verdict === 'match'
+      ? 'The math checks out — the billed amount matches our estimate.'
+      : check.verdict === 'close'
+        ? `Close enough — we estimated ${formatCurrency(check.expectedAmount)} vs. ${formatCurrency(check.billedAmount)} billed. Small gaps (under ~5%) usually come from fixed charges or your exact tax rate area.`
+        : `The bill differs noticeably from our estimate (${formatCurrency(check.expectedAmount)} expected vs. ${formatCurrency(check.billedAmount)} billed). Double-check the values, then call your county assessor to walk through the calculation.`;
+
+  return {
+    title: 'Supplemental Bill Check',
+    subtitle: 'Verification and payment deadlines',
+    sections: [
+      {
+        title: 'Verification result',
+        highlights: [
+          { label: 'Amount on your bill', value: formatCurrency(check.billedAmount) },
+          { label: 'Our estimate', value: formatCurrency(check.expectedAmount) },
+          { label: 'Difference', value: formatCurrency(Math.abs(check.difference)) },
+        ],
+        paragraphs: [verdictText],
+      },
+      {
+        title: 'Payment deadlines — keep this handy',
+        rows: installments.map((inst) => [
+          `${inst.label} — ${formatCurrency(inst.amount, 2)}`,
+          inst.delinquentDate ? `Late after ${formatISODate(inst.delinquentDate)}` : 'See bill',
+        ]),
+        paragraphs: [
+          'Pay on or before each delinquent date. A late installment adds a 10% penalty (plus a small fee on the second). If a date falls on a weekend or holiday, you have until the next business day. You can pay both installments at once.',
+        ],
+      },
+    ],
+  };
+}
+
 function Outcome({ outcome }: { outcome: CheckOutcome }) {
   const { check, installments } = outcome;
 
@@ -272,6 +310,8 @@ function Outcome({ outcome }: { outcome: CheckOutcome }) {
           installments at once — many homeowners do, to avoid forgetting the second one.
         </p>
       </div>
+
+      <ReportButton report={buildReport(outcome)} />
     </section>
   );
 }

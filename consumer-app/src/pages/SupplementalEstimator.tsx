@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import MoneyInput from '../components/MoneyInput';
 import CountyRatePicker from '../components/CountyRatePicker';
+import AddressLookup from '../components/AddressLookup';
+import ReportButton from '../components/ReportButton';
 import Callout from '../components/Callout';
 import {
   estimateSupplementalTax,
@@ -11,6 +13,16 @@ import {
   parseISODate,
   type SupplementalEstimate,
 } from '../lib/tax';
+import type { ReportData } from '../lib/report';
+
+interface InputSnapshot {
+  eventDate: string;
+  price: number;
+  prior: number;
+  county: string;
+  taxRate: number;
+  address: string;
+}
 
 export default function SupplementalEstimator() {
   const [eventDate, setEventDate] = useState('');
@@ -18,8 +30,10 @@ export default function SupplementalEstimator() {
   const [priorValue, setPriorValue] = useState('');
   const [county, setCounty] = useState('');
   const [rate, setRate] = useState('1.10');
+  const [address, setAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SupplementalEstimate | null>(null);
+  const [snapshot, setSnapshot] = useState<InputSnapshot | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +51,7 @@ export default function SupplementalEstimator() {
     if (Number.isNaN(taxRate) || taxRate <= 0 || taxRate > 5)
       return setError('Please enter a valid tax rate (for example, 1.10).');
 
+    setSnapshot({ eventDate, price, prior, county, taxRate, address });
     setResult(
       estimateSupplementalTax({
         eventDate,
@@ -64,6 +79,13 @@ export default function SupplementalEstimator() {
       </header>
 
       <form onSubmit={handleSubmit} className="card sm:p-8 space-y-6">
+        <AddressLookup
+          onResolved={(foundCounty, matchedAddress) => {
+            setCounty(foundCounty);
+            setAddress(matchedAddress);
+          }}
+        />
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="eventDate" className="input-label">
@@ -113,12 +135,96 @@ export default function SupplementalEstimator() {
         </button>
       </form>
 
-      {result && <Results result={result} savingsPerMonth={savingsPerMonth} />}
+      {result && snapshot && (
+        <Results result={result} snapshot={snapshot} savingsPerMonth={savingsPerMonth} />
+      )}
     </div>
   );
 }
 
-function Results({ result, savingsPerMonth }: { result: SupplementalEstimate; savingsPerMonth: number }) {
+function buildReport(
+  result: SupplementalEstimate,
+  snapshot: InputSnapshot,
+  savingsPerMonth: number
+): ReportData {
+  const sections: ReportData['sections'] = [
+    {
+      title: 'Your details',
+      rows: [
+        ['Closing / event date', formatISODate(snapshot.eventDate)],
+        ['Purchase price (new value)', formatCurrency(snapshot.price)],
+        ["Seller's previous assessed value", formatCurrency(snapshot.prior)],
+        ['County', snapshot.county || '—'],
+        ['Tax rate used', `${snapshot.taxRate.toFixed(2)}%`],
+      ],
+    },
+  ];
+
+  if (result.isRefund) {
+    sections.push({
+      title: 'What to expect',
+      paragraphs: [
+        `You paid less than the previous assessed value, so the county should issue a negative supplemental assessment of ${formatCurrency(Math.abs(result.supplementalAssessment))}. Instead of a bill, expect a refund of roughly ${formatCurrency(result.totalAmount)}. Refunds are processed automatically but can take several months — contact your county tax collector if nothing arrives.`,
+      ],
+    });
+  } else {
+    sections.push({
+      title: 'What to expect',
+      highlights: [
+        { label: 'Supplemental bills', value: String(result.bills.length) },
+        { label: 'Estimated total', value: formatCurrency(result.totalAmount) },
+        { label: 'Suggested set-aside', value: `${formatCurrency(savingsPerMonth)}/mo` },
+      ],
+      paragraphs: [
+        `Your assessed value increases by ${formatCurrency(result.supplementalAssessment)}, effective ${formatISODate(result.effectiveDate)} (the first of the month after your purchase). Counties usually mail supplemental bills 3–6 months after closing.`,
+      ],
+    });
+
+    for (const bill of result.bills) {
+      sections.push({
+        title:
+          result.bills.length === 2
+            ? `Bill ${bill.billNumber} of 2 — tax year ${bill.fiscalYear.label}`
+            : `Supplemental bill — tax year ${bill.fiscalYear.label}`,
+        rows: [
+          ['Estimated amount', formatCurrency(bill.amount)],
+          ['Full-year tax on the increase', formatCurrency(bill.fullYearTax)],
+          ['Portion of year billed', `${bill.prorationMonths} of 12 months (${(bill.prorationFactor * 100).toFixed(0)}%)`],
+          ['Paid in', '2 installments'],
+        ],
+      });
+    }
+
+    sections.push({
+      title: 'Your action checklist',
+      list: [
+        `Set aside about ${formatCurrency(savingsPerMonth)}/month starting now so the bill is covered when it arrives.`,
+        'Do not assume your mortgage escrow will pay supplemental bills — they are mailed to you and are your responsibility. Call your lender if you want them to handle it.',
+        "File the free homeowner's exemption with your county assessor if this is your primary residence ($7,000 off your assessed value every year).",
+        'When the bill arrives, verify the amounts and note the delinquent dates — a late installment adds a 10% penalty.',
+      ],
+    });
+  }
+
+  return {
+    title: 'Supplemental Tax Estimate',
+    subtitle: 'What to expect after your purchase',
+    address: snapshot.address || undefined,
+    sections,
+  };
+}
+
+function Results({
+  result,
+  snapshot,
+  savingsPerMonth,
+}: {
+  result: SupplementalEstimate;
+  snapshot: InputSnapshot;
+  savingsPerMonth: number;
+}) {
+  const report = buildReport(result, snapshot, savingsPerMonth);
+
   if (result.isRefund) {
     return (
       <section className="space-y-4">
@@ -131,6 +237,7 @@ function Results({ result, savingsPerMonth }: { result: SupplementalEstimate; sa
             arrives.
           </p>
         </Callout>
+        <ReportButton report={report} />
       </section>
     );
   }
@@ -263,6 +370,8 @@ function Results({ result, savingsPerMonth }: { result: SupplementalEstimate; sa
           difference between the old and new assessed values for the period shown.
         </p>
       </Callout>
+
+      <ReportButton report={report} />
     </section>
   );
 }

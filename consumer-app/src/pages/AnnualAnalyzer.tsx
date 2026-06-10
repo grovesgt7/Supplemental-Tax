@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import MoneyInput from '../components/MoneyInput';
 import CountyRatePicker from '../components/CountyRatePicker';
+import AddressLookup from '../components/AddressLookup';
+import ReportButton from '../components/ReportButton';
 import Callout from '../components/Callout';
 import {
   analyzeAnnualBill,
@@ -11,6 +13,7 @@ import {
   HOMEOWNERS_EXEMPTION,
   type AnnualBillAnalysis,
 } from '../lib/tax';
+import type { ReportData } from '../lib/report';
 
 export default function AnnualAnalyzer() {
   const [assessedValue, setAssessedValue] = useState('');
@@ -20,6 +23,7 @@ export default function AnnualAnalyzer() {
   const [directCharges, setDirectCharges] = useState('');
   const [hasExemption, setHasExemption] = useState<'yes' | 'no' | 'unsure'>('unsure');
   const [changedHands, setChangedHands] = useState(false);
+  const [address, setAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnnualBillAnalysis | null>(null);
 
@@ -63,6 +67,13 @@ export default function AnnualAnalyzer() {
       </header>
 
       <form onSubmit={handleSubmit} className="card sm:p-8 space-y-6">
+        <AddressLookup
+          onResolved={(foundCounty, matchedAddress) => {
+            setCounty(foundCounty);
+            setAddress(matchedAddress);
+          }}
+        />
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <MoneyInput
             id="assessed"
@@ -143,14 +154,85 @@ export default function AnnualAnalyzer() {
         </button>
       </form>
 
-      {analysis && <Results analysis={analysis} hasExemption={hasExemption} />}
+      {analysis && (
+        <Results analysis={analysis} hasExemption={hasExemption} county={county} address={address} />
+      )}
     </div>
   );
 }
 
 const SEGMENT_COLORS = ['bg-brand-600', 'bg-brand-400', 'bg-amber-400'];
 
-function Results({ analysis, hasExemption }: { analysis: AnnualBillAnalysis; hasExemption: 'yes' | 'no' | 'unsure' }) {
+function buildReport(
+  analysis: AnnualBillAnalysis,
+  hasExemption: 'yes' | 'no' | 'unsure',
+  county: string,
+  address: string
+): ReportData {
+  const sections: ReportData['sections'] = [
+    {
+      title: 'Your bill, decoded',
+      highlights: [
+        { label: 'Total per year', value: formatCurrency(analysis.totalTax) },
+        { label: 'Per month', value: formatCurrency(analysis.monthlyCost) },
+        { label: 'Effective rate', value: formatPercent(analysis.effectiveRate) },
+      ],
+      rows: [
+        ['Base 1% tax (Prop 13)', formatCurrency(analysis.baseTax)],
+        ['Voter-approved debt', formatCurrency(analysis.voterApprovedTax)],
+        ['Direct assessments / special charges', formatCurrency(analysis.directAssessments)],
+        ['County', county || '—'],
+      ],
+    },
+    {
+      title: 'Payment deadlines',
+      rows: analysis.installments.map((inst) => [
+        `${inst.label} — ${formatCurrency(inst.amount, 2)}`,
+        inst.delinquentDate ? `Due ${inst.dueDate ? formatISODate(inst.dueDate) : ''}; late after ${formatISODate(inst.delinquentDate)}` : '',
+      ]),
+      paragraphs: ['Each late installment adds a 10% penalty.'],
+    },
+  ];
+
+  if (analysis.prop13.checked) {
+    sections.push({
+      title: 'Prop 13 check',
+      paragraphs: [
+        analysis.prop13.exceedsCap
+          ? `Your assessed value rose ${formatPercent((analysis.prop13.increasePct ?? 0) * 100, 1)} year-over-year, above the normal 2% cap. Unless the property changed hands, construction was completed, or a prior temporary (Prop 8) reduction is being restored, contact your county assessor and consider an assessment appeal before your county's deadline.`
+          : `Your assessed value changed ${formatPercent((analysis.prop13.increasePct ?? 0) * 100, 1)} year-over-year, within the 2% annual Prop 13 limit. Nothing unusual.`,
+      ],
+    });
+  }
+
+  if (hasExemption !== 'yes') {
+    sections.push({
+      title: 'Possible savings',
+      paragraphs: [
+        `If this home is your primary residence, the free homeowner's exemption removes ${formatCurrency(HOMEOWNERS_EXEMPTION)} from your assessed value — worth about ${formatCurrency(analysis.exemptionSavings)} per year at your tax rate. File once with your county assessor (ignore mailers that charge a fee for this).`,
+      ],
+    });
+  }
+
+  return {
+    title: 'Annual Tax Bill Analysis',
+    subtitle: 'Your property tax bill in plain English',
+    address: address || undefined,
+    sections,
+  };
+}
+
+function Results({
+  analysis,
+  hasExemption,
+  county,
+  address,
+}: {
+  analysis: AnnualBillAnalysis;
+  hasExemption: 'yes' | 'no' | 'unsure';
+  county: string;
+  address: string;
+}) {
   const segments = [
     { label: 'Base 1% tax (Prop 13)', amount: analysis.baseTax },
     { label: 'Voter-approved debt', amount: analysis.voterApprovedTax },
@@ -259,6 +341,8 @@ function Results({ analysis, hasExemption }: { analysis: AnnualBillAnalysis; has
           Each late installment adds a 10% penalty. Dates shown are for the current tax year.
         </p>
       </div>
+
+      <ReportButton report={buildReport(analysis, hasExemption, county, address)} />
     </section>
   );
 }
